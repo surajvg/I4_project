@@ -1,0 +1,567 @@
+// src/App.js
+import React, { useState } from "react";
+import {
+  Container,
+  Paper,
+  Typography,
+  Tabs,
+  Tab,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableBody,
+  Grid,
+  TextField,
+  Select,
+  MenuItem,
+  Button,
+  Box,
+  Divider,
+  Card,
+  CardContent,
+  IconButton,
+} from "@mui/material";
+import { Calculate, Delete, Add } from "@mui/icons-material";
+
+export default function InspectionFormApp() {
+  // ---------- Mock data (GR list) ----------
+  const mockGRList = [
+    {
+      grNumber: "100001",
+      grDate: "2025-11-01",
+      bellPartNumber: "BELLAX123400",
+      description: "Multi-pin Connector",
+      poNumber: "PO-5678",
+      vendor: "Acme Electronics",
+      mpnDirectory: "MPN-AX-999",
+      mpnPO: "MPN-AX-900",
+      mpnReceived: "MPN-AX-901",
+      wbsElement: "WBS-100",
+      clOrderNumber: "CL-500",
+      manufacturer: "Bell Components",
+      dateCode: "2025W40",
+      lotCode: "LOT-4321",
+      quantity: 100,
+      dimensions: [
+        { label: "Length", base: 100, tol: 0.5 },
+        { label: "Width", base: 50, tol: 0.3 },
+        { label: "Height", base: 20, tol: 0.2 },
+      ],
+      electricalTests: [
+        { label: "Resistance (Ω)", base: 10, tol: 0.5 },
+        { label: "Insulation (MΩ)", base: 100, tol: 5 },
+      ],
+    },
+    {
+      grNumber: "100002",
+      grDate: "2025-11-05",
+      bellPartNumber: "BELLRES22000",
+      description: "Resistor 0603",
+      poNumber: "PO-9988",
+      vendor: "Parts House",
+      mpnDirectory: "MPN-RES0603",
+      mpnPO: "MPN-RES0603-PO",
+      mpnReceived: "MPN-RES0603-REC",
+      wbsElement: "WBS-200",
+      clOrderNumber: "CL-700",
+      manufacturer: "OhmCorp",
+      dateCode: "2025W39",
+      lotCode: "LOT-998",
+      quantity: 200,
+      dimensions: [
+        { label: "Length", base: 1.6, tol: 0.1 },
+        { label: "Width", base: 0.8, tol: 0.05 },
+      ],
+      electricalTests: [
+        { label: "Resistance (Ω)", base: 1000, tol: 50 },
+        { label: "Capacitance (pF)", base: 10, tol: 1 },
+      ],
+    },
+  ];
+
+  // ---------- App state ----------
+  const [tab, setTab] = useState("Pending");
+  const [selectedGR, setSelectedGR] = useState(null);
+  const [sampleType, setSampleType] = useState("");
+  const [sampling, setSampling] = useState({ percent: 0, sampleCount: 0 });
+  const [measurements, setMeasurements] = useState({ mechanical: {}, electrical: {} });
+  const [instruments, setInstruments] = useState([]);
+  const [acceptance, setAcceptance] = useState({ accepted: 0, rejected: 0, pending: 0 });
+  const [inspector, setInspector] = useState({ staffNo: "", name: "" });
+  const [approver, setApprover] = useState({ staffNo: "", name: "" });
+
+  // ---------- Helpers ----------
+  function calculateSampleCount(totalQty, percent) {
+    const p = Number(percent) || 0;
+    if (p <= 0) return 0;
+    return Math.max(1, Math.ceil((p / 100) * totalQty));
+  }
+
+  function handleSelectGR(gr) {
+    setSelectedGR(gr);
+    setSampleType("");
+    setSampling({ percent: 0, sampleCount: 0 });
+    setMeasurements({ mechanical: {}, electrical: {} });
+    setInstruments([]);
+    setAcceptance({ accepted: 0, rejected: 0, pending: 0 });
+  }
+
+  function ensureMeasurementArray(kind, label, len) {
+    setMeasurements((prev) => {
+      const copy = { mechanical: { ...prev.mechanical }, electrical: { ...prev.electrical } };
+      const map = copy[kind];
+      if (!map[label] || map[label].length !== len) {
+        map[label] = Array(len).fill("");
+      }
+      return copy;
+    });
+  }
+
+  // ✅ Prevent negative sample %
+  function handleSamplingPercentChange(pct) {
+    if (!selectedGR) return;
+    let value = Number(pct);
+    if (isNaN(value) || value < 0) value = 0;
+    const sc = calculateSampleCount(selectedGR.quantity, value);
+    setSampling({ percent: value, sampleCount: sc });
+
+    if (selectedGR.dimensions) {
+      selectedGR.dimensions.forEach((d) => ensureMeasurementArray("mechanical", d.label, sc));
+    }
+    if (selectedGR.electricalTests) {
+      selectedGR.electricalTests.forEach((t) => ensureMeasurementArray("electrical", t.label, sc));
+    }
+  }
+
+  function handleMeasurementChange(kind, label, index, value) {
+    setMeasurements((prev) => {
+      const copy = { mechanical: { ...prev.mechanical }, electrical: { ...prev.electrical } };
+      if (!copy[kind][label]) copy[kind][label] = Array(sampling.sampleCount).fill("");
+      const arr = [...copy[kind][label]];
+      arr[index] = value;
+      copy[kind][label] = arr;
+      return copy;
+    });
+  }
+
+  function addInstrument() {
+    setInstruments((p) => [...p, { serial: "", part: "", desc: "", model: "", cal: "", due: "" }]);
+  }
+  function removeInstrument(idx) {
+    setInstruments((p) => p.filter((_, i) => i !== idx));
+  }
+  function updateInstrument(idx, field, value) {
+    setInstruments((p) => {
+      const copy = [...p];
+      copy[idx] = { ...copy[idx], [field]: value };
+      return copy;
+    });
+  }
+
+  function calculateAcceptance() {
+    if (!selectedGR) return;
+    const sc = sampling.sampleCount;
+    if (sc === 0) {
+      setAcceptance({ accepted: 0, rejected: 0, pending: 0 });
+      return;
+    }
+
+    let accepted = 0;
+    let rejected = 0;
+    let pending = 0;
+
+    for (let i = 0; i < sc; i++) {
+      const needMechanical = sampleType === "Mechanical" || sampleType === "Electro-Mechanical";
+      const needElectrical = sampleType === "Electrical" || sampleType === "Electro-Mechanical";
+
+      let mechMissing = false;
+      let mechFail = false;
+      if (needMechanical) {
+        for (const d of selectedGR.dimensions || []) {
+          const arr = measurements.mechanical[d.label] || [];
+          const raw = arr[i];
+          const v = parseFloat(raw);
+          if (raw === "" || raw === undefined || isNaN(v)) {
+            mechMissing = true;
+            break;
+          }
+          const min = d.base - d.tol;
+          const max = d.base + d.tol;
+          if (v < min || v > max) mechFail = true;
+        }
+      }
+
+      let elecMissing = false;
+      let elecFail = false;
+      if (needElectrical) {
+        for (const t of selectedGR.electricalTests || []) {
+          const arr = measurements.electrical[t.label] || [];
+          const raw = arr[i];
+          const v = parseFloat(raw);
+          if (raw === "" || raw === undefined || isNaN(v)) {
+            elecMissing = true;
+            break;
+          }
+          const min = t.base - t.tol;
+          const max = t.base + t.tol;
+          if (v < min || v > max) elecFail = true;
+        }
+      }
+
+      if ((needMechanical && mechMissing) || (needElectrical && elecMissing)) pending++;
+      else if ((needMechanical && mechFail) || (needElectrical && elecFail)) rejected++;
+      else accepted++;
+    }
+
+    setAcceptance({ accepted, rejected, pending });
+  }
+
+  // ---------- UI ----------
+  return (
+    <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+      <Paper sx={{ p: 3, borderRadius: 3 }}>
+        <Typography variant="h4" align="center" fontWeight="bold" gutterBottom color="primary">
+          INSPECTION FORM
+        </Typography>
+
+        <Tabs
+          value={tab}
+          onChange={(e, val) => setTab(val)}
+          textColor="primary"
+          indicatorColor="primary"
+          centered
+        >
+          <Tab label="Pending" value="Pending" />
+          <Tab label="Accepted" value="Accepted" />
+          <Tab label="Rejected" value="Rejected" />
+          <Tab label="Total" value="Total" />
+        </Tabs>
+
+        {tab === "Pending" && (
+          <Box mt={3}>
+            <Typography variant="h6">Available GRs</Typography>
+            <Table size="small" sx={{ mb: 3 }}>
+              <TableHead>
+                <TableRow>
+                  <TableCell>GR Number</TableCell>
+                  <TableCell>Date</TableCell>
+                  <TableCell>Part Number</TableCell>
+                  <TableCell>Description</TableCell>
+                  <TableCell>Vendor</TableCell>
+                  <TableCell>PO</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {mockGRList.map((gr) => (
+                  <TableRow
+                    key={gr.grNumber}
+                    hover
+                    onClick={() => handleSelectGR(gr)}
+                    sx={{
+                      cursor: "pointer",
+                      backgroundColor:
+                        selectedGR && selectedGR.grNumber === gr.grNumber
+                          ? "rgba(25,118,210,0.12)"
+                          : "inherit",
+                    }}
+                  >
+                    <TableCell>{gr.grNumber}</TableCell>
+                    <TableCell>{gr.grDate}</TableCell>
+                    <TableCell>{gr.bellPartNumber}</TableCell>
+                    <TableCell>{gr.description}</TableCell>
+                    <TableCell>{gr.vendor}</TableCell>
+                    <TableCell>{gr.poNumber}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+
+            {selectedGR && (
+              <Box mb={3}>
+                {/* GR Details */}
+                <Typography variant="h6">GR Details</Typography>
+                <Box
+      display="flex"
+      flexDirection={{ xs: "column", md: "row" }}
+      gap={4}
+      justifyContent="space-between"
+    >
+      {/* Left column */}
+      <Box flex={1}>
+        <Table size="small">
+          <TableBody>
+            {[
+              ["GR Number", selectedGR.grNumber],
+              ["GR Date", selectedGR.grDate],
+              ["Bell Part No", selectedGR.bellPartNumber],
+              ["Description", selectedGR.description],
+              ["PO Number", selectedGR.poNumber],
+              ["Vendor", selectedGR.vendor],
+              ["MPN Directory", selectedGR.mpnDirectory],
+            ].map(([label, value]) => (
+              <TableRow key={label}>
+                <TableCell sx={{ fontWeight: "bold", width: "45%" }}>{label}</TableCell>
+                <TableCell>{value}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Box>
+
+      {/* Right column */}
+      <Box flex={1}>
+        <Table size="small">
+          <TableBody>
+            {[
+              ["MPN (PO)", selectedGR.mpnPO],
+              ["MPN (Received)", selectedGR.mpnReceived],
+              ["WBS Element", selectedGR.wbsElement],
+              ["CL Order Number", selectedGR.clOrderNumber],
+              ["Manufacturer", selectedGR.manufacturer],
+              ["Date Code", selectedGR.dateCode],
+              ["Lot Code", selectedGR.lotCode],
+            ].map(([label, value]) => (
+              <TableRow key={label}>
+                <TableCell sx={{ fontWeight: "bold", width: "45%" }}>{label}</TableCell>
+                <TableCell>{value}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Box>
+      </Box>
+
+                {/* Sample Type */}
+                <Box mb={2}>
+                  <Typography variant="subtitle1">Sample Type</Typography>
+                  <Select
+                    fullWidth
+                    value={sampleType}
+                    onChange={(e) => setSampleType(e.target.value)}
+                    displayEmpty
+                  >
+                    <MenuItem value="">Select Sample Type</MenuItem>
+                    <MenuItem value="Mechanical">Mechanical</MenuItem>
+                    <MenuItem value="Electrical">Electrical</MenuItem>
+                    <MenuItem value="Electro-Mechanical">Electro-Mechanical</MenuItem>
+                  </Select>
+                </Box>
+
+                {/* Sampling % */}
+                <Box my={2} display="flex" alignItems="center" gap={2}>
+                  <TextField
+                    label="Sample %"
+                    type="number"
+                    value={sampling.percent}
+                    onChange={(e) => handleSamplingPercentChange(e.target.value)}
+                    sx={{ width: 140 }}
+                  />
+                  <Typography>
+                    Samples to inspect: <b>{sampling.sampleCount}</b> (Qty: {selectedGR.quantity})
+                  </Typography>
+                </Box>
+
+                {/* Mechanical Table */}
+                <Box mt={2}>
+                  <Typography variant="h6">Measured Physical Dimensions (Mechanical)</Typography>
+                  <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
+                    If Mechanical selected: inputs enabled. If Electrical selected: inputs disabled
+                    but visible.
+                  </Typography>
+
+                  <Table size="small" sx={{ mb: 2 }}>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Basic Value</TableCell>
+                        <TableCell>Lower ( - Tol )</TableCell>
+                        <TableCell>Upper ( + Tol )</TableCell>
+                        <TableCell>Min</TableCell>
+                        <TableCell>Max</TableCell>
+                        {(sampleType === "Mechanical" || sampleType === "Electro-Mechanical") &&
+                          [...Array(Math.max(1, sampling.sampleCount))].map((_, idx) => (
+                            <TableCell key={idx}>Samp {idx + 1}</TableCell>
+                          ))}
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {selectedGR.dimensions.map((d) => {
+                        const min = (d.base - d.tol).toFixed(4);
+                        const max = (d.base + d.tol).toFixed(4);
+                        return (
+                          <TableRow key={d.label}>
+                            <TableCell>{d.base}</TableCell>
+                            <TableCell>{-d.tol}</TableCell>
+                            <TableCell>{d.tol}</TableCell>
+                            <TableCell>{min}</TableCell>
+                            <TableCell>{max}</TableCell>
+                            {(sampleType === "Mechanical" || sampleType === "Electro-Mechanical") &&
+                              [...Array(sampling.sampleCount)].map((_, i) => (
+                                <TableCell key={i}>
+                                  <TextField
+                                    size="small"
+                                    type="number"
+                                    value={(measurements.mechanical[d.label] || [])[i] ?? ""}
+                                    onChange={(e) =>
+                                      handleMeasurementChange(
+                                        "mechanical",
+                                        d.label,
+                                        i,
+                                        e.target.value
+                                      )
+                                    }
+                                    disabled={
+                                      sampleType !== "Mechanical" &&
+                                      sampleType !== "Electro-Mechanical"
+                                    }
+                                  />
+                                </TableCell>
+                              ))}
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </Box>
+
+                {/* Electrical Table */}
+                <Box mt={2}>
+                  <Typography variant="h6">Electrical Test Report</Typography>
+                  <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
+                    If Electrical selected: inputs enabled. If Mechanical selected: inputs disabled
+                    but visible.
+                  </Typography>
+
+                  <Table size="small" sx={{ mb: 2 }}>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Basic Value</TableCell>
+                        <TableCell>Lower ( - Tol )</TableCell>
+                        <TableCell>Upper ( + Tol )</TableCell>
+                        <TableCell>Min</TableCell>
+                        <TableCell>Max</TableCell>
+                        {(sampleType === "Electrical" || sampleType === "Electro-Mechanical") &&
+                          [...Array(Math.max(1, sampling.sampleCount))].map((_, idx) => (
+                            <TableCell key={idx}>Samp {idx + 1}</TableCell>
+                          ))}
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {selectedGR.electricalTests.map((t) => {
+                        const min = (t.base - t.tol).toFixed(4);
+                        const max = (t.base + t.tol).toFixed(4);
+                        return (
+                          <TableRow key={t.label}>
+                            <TableCell>{t.base}</TableCell>
+                            <TableCell>{-t.tol}</TableCell>
+                            <TableCell>{t.tol}</TableCell>
+                            <TableCell>{min}</TableCell>
+                            <TableCell>{max}</TableCell>
+                            {(sampleType === "Electrical" || sampleType === "Electro-Mechanical") &&
+                              [...Array(sampling.sampleCount)].map((_, i) => (
+                                <TableCell key={i}>
+                                  <TextField
+                                    size="small"
+                                    type="number"
+                                    value={(measurements.electrical[t.label] || [])[i] ?? ""}
+                                    onChange={(e) =>
+                                      handleMeasurementChange(
+                                        "electrical",
+                                        t.label,
+                                        i,
+                                        e.target.value
+                                      )
+                                    }
+                                    disabled={
+                                      sampleType !== "Electrical" &&
+                                      sampleType !== "Electro-Mechanical"
+                                    }
+                                  />
+                                </TableCell>
+                              ))}
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </Box>
+
+                {/* Acceptance */}
+                <Box my={3} textAlign="center">
+                  <Button
+                    variant="contained"
+                    startIcon={<Calculate />}
+                    onClick={calculateAcceptance}
+                    sx={{ mb: 2 }}
+                  >
+                    Calculate Acceptance
+                  </Button>
+
+                  <Box display="flex" justifyContent="center" gap={4}>
+                    <Typography variant="subtitle1">
+                      ✅ Accepted: <b>{acceptance.accepted}</b>
+                    </Typography>
+                    <Typography variant="subtitle1">
+                      ❌ Rejected: <b>{acceptance.rejected}</b>
+                    </Typography>
+                    <Typography variant="subtitle1">
+                      ⏳ Pending: <b>{acceptance.pending}</b>
+                    </Typography>
+                  </Box>
+                </Box>
+
+                {/* Inspector & Approver */}
+                <Box mt={4}>
+                  <Grid container spacing={4}>
+                    <Grid item xs={12} md={6}>
+                      <Typography variant="h6" gutterBottom>Inspected By</Typography>
+                      <TextField
+                        fullWidth
+                        label="Staff No"
+                        size="small"
+                        value={inspector.staffNo}
+                        onChange={(e) => setInspector((prev) => ({ ...prev, staffNo: e.target.value }))}
+                        sx={{ mb: 2 }}
+                      />
+                      <TextField
+                        fullWidth
+                        label="Name"
+                        size="small"
+                        value={inspector.name}
+                        onChange={(e) => setInspector((prev) => ({ ...prev, name: e.target.value }))}
+                        sx={{ mb: 2 }}
+                      />
+                      <Button variant="outlined" fullWidth>Upload Signature</Button>
+                    </Grid>
+
+                    <Grid item xs={12} md={6}>
+                      <Typography variant="h6" gutterBottom>Approved By</Typography>
+                      <TextField
+                        fullWidth
+                        label="Staff No"
+                        size="small"
+                        value={approver.staffNo}
+                        onChange={(e) => setApprover((prev) => ({ ...prev, staffNo: e.target.value }))}
+                        sx={{ mb: 2 }}
+                      />
+                      <TextField
+                        fullWidth
+                        label="Name"
+                        size="small"
+                        value={approver.name}
+                        onChange={(e) => setApprover((prev) => ({ ...prev, name: e.target.value }))}
+                        sx={{ mb: 2 }}
+                      />
+                      <Button variant="outlined" fullWidth>Upload Signature</Button>
+                    </Grid>
+                  </Grid>
+                </Box>
+
+              </Box>
+            )}
+          </Box>
+        )}
+      </Paper>
+    </Container>
+  );
+}
