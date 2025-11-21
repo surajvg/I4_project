@@ -1,0 +1,50 @@
+// React Table Validation Logic
+
+const validateSample = (sampleIndex) => {
+  for (let row of rows) {
+    const val = parseFloat(row.observed[sampleIndex]);
+    const min = parseFloat(row.min);
+    const max = parseFloat(row.max);
+
+    if (isNaN(val) || val < min || val > max) {
+      return false; // One dimension failed → whole sample fails
+    }
+  }
+  return true; // All dimensions passed → sample passes
+};
+
+// TableCell Background Logic
+{
+  row.observed.map((val, j) => (
+    <TableCell
+      key={j}
+      sx={{
+        border: "1px solid black",
+        backgroundColor: !validateSample(j) ? "#ffcccc" : "#ccffcc",
+      }}
+    >
+      <TextField
+        variant="standard"
+        fullWidth
+        value={val}
+        onChange={(e) => handleChange(i, "observed", e.target.value, j)}
+      />
+    </TableCell>
+  ));
+}
+
+// Optional Combined Logic
+backgroundColor: isRejectedValue(val, row.min, row.max)
+  ? "#ff9999"
+  : validateSample(j)
+    ? "#ccffcc"
+    : "#ffcccc";
+
+// Example usage
+{
+  Array.from({ length: sampleCount }).map((_, j) => (
+    <p key={j}>
+      Sample {j + 1}: {validateSample(j) ? "Accepted" : "Rejected"}
+    </p>
+  ));
+}
