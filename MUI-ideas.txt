@@ -1,0 +1,150 @@
+Material-UI (MUI) color suggestions in navy + light blue theme, with hex codes and usage suggestions for Paper, Table, Grid backgrounds, borders, and highlights.
+
+
+---
+
+🎨 Navy + Light Blue Modern Palette (Premium Look)
+
+Primary Navy Shades
+
+Purpose	Color Name	Hex Code	Looks Best On
+
+Primary background / Paper	Navy 900	#0A192F	Dark theme dashboards, inspection screens
+Secondary background	Navy 800	#102A43	Side panels, table header backgrounds
+Border + subtle dark	Navy 700	#243B53	Grid borders, dividers
+Highlight navy	Navy 600	#334E68	Buttons, headers
+
+
+
+---
+
+Light Blue / Sky Shades (Contrasting + Clean UI)
+
+Purpose	Color Name	Hex Code	Looks Best On
+
+Table background / lighter paper	Blue 50	#E6F6FF	Very soft and clean background
+Hover rows	Blue 100	#D0EFFF	Table hover, cards
+Accent highlight	Blue 200	#A5D8FF	Info boxes, subtle highlights
+Primary accent	Blue 400	#4FC3F7	Icons, borders, chips
+Buttons / call-to-action	Blue 600	#0288D1	Strong but not too bright
+
+
+
+---
+
+💠 Suggested Combinations
+
+1️⃣ Clean Professional UI (Dark Navy Background + Light Blue Table)
+
+Paper / Main Background:
+#102A43 (Navy 800)
+
+Table Background:
+#E6F6FF (Blue 50)
+
+Table Header:
+#334E68 (Navy 600)
+
+Borders:
+#243B53 (Navy 700)
+
+Hover Row:
+#D0EFFF (Blue 100)
+
+Looks modern + premium.
+
+
+---
+
+2️⃣ Light Theme (White + Light Blue + Navy Accents)
+
+Paper:
+#FFFFFF
+
+Table Background:
+#E6F6FF (Blue 50)
+
+Header Background:
+#A5D8FF (Blue 200)
+
+Primary Text:
+#0A192F (Navy 900)
+
+Grid Border:
+#4FC3F7 (Blue 400)
+
+Good for forms + inspection UI.
+
+
+---
+
+3️⃣ Mixed Theme — Soft and Corporate
+
+Paper:
+#F0F8FF (Soft Alice Blue)
+
+Grid Background:
+#E6F6FF (Blue 50)
+
+Table Header:
+#102A43 (Navy 800)
+
+Accent Border:
+#0288D1 (Blue 600)
+
+Buttons:
+#0288D1 (Blue 600)
+
+
+---
+
+📌 CSS/MUI Example Usage
+
+<Paper sx={{ backgroundColor: "#102A43", padding: 2 }}>
+  <Table sx={{ backgroundColor: "#E6F6FF" }}>
+    <TableHead>
+      <TableRow sx={{ backgroundColor: "#334E68" }}>
+        <TableCell sx={{ color: "#E6F6FF" }}>Dimension</TableCell>
+      </TableRow>
+    </TableHead>
+  </Table>
+</Paper>
+
+
+---
+
+⭐ Recommended Full Palette Set (Copy-Paste Ready)
+
+NAVY
+
+#0A192F
+
+#102A43
+
+#243B53
+
+#334E68
+
+
+LIGHT BLUE
+
+#E6F6FF
+
+#D0EFFF
+
+#A5D8FF
+
+#4FC3F7
+
+#0288D1
+
+
+
+---
+
+If you want, I can also:
+
+🎨 Generate a complete MUI theme object (createTheme) using these navy + blue shades.
+📄 Or export them into a .txt / .json / .ts palette file.
+
+Just tell me!
